@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment — LaNature Hotel</title>
+  <meta name="description" content="Complete your order payment at LaNature Hotel.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar scrolled">
+    <div class="container">
+      <a href="index.html" class="navbar-brand">
+        <div class="logo-icon">L</div>
+        <h1>La<span>Nature</span></h1>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Payment Section -->
+  <div class="payment-page">
+    <div class="container">
+      <!-- Step 1: Order Summary & Payment Options -->
+      <div id="paymentStep">
+        <div class="payment-card">
+          <h2>Order Summary</h2>
+          <div class="order-summary-list" id="summaryItems"></div>
+          <div class="order-total-row">
+            <span>Grand Total</span>
+            <span id="summaryTotal">₹0</span>
+          </div>
+          <h3 style="font-family:var(--font-heading);margin-top:28px;margin-bottom:16px;text-align:center;">Choose Payment Method</h3>
+          <div class="payment-options">
+            <div class="payment-option" onclick="payOnline()" id="payOnlineBtn">
+              <div class="po-icon online">💳</div>
+              <div>
+                <h4>Pay Online</h4>
+                <p>UPI, Credit/Debit Card, Net Banking</p>
+              </div>
+            </div>
+            <div class="payment-option" onclick="payCash()" id="payCashBtn">
+              <div class="po-icon cash">💵</div>
+              <div>
+                <h4>Pay with Cash</h4>
+                <p>Pay to our staff when food is delivered</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Online Payment Simulation -->
+      <div id="onlinePayStep" style="display:none;">
+        <div class="payment-card" style="text-align:center;">
+          <div class="payment-sim" id="paymentSim">
+            <div class="spinner"></div>
+            <h3 style="font-family:var(--font-heading);">Processing Payment...</h3>
+            <p style="color:var(--text-light);margin-top:8px;">Please wait while we verify your payment</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Cash Payment Message -->
+      <div id="cashPayStep" style="display:none;">
+        <div class="payment-card" style="text-align:center;">
+          <div style="font-size:3rem;margin-bottom:16px;">💵</div>
+          <h3 style="font-family:var(--font-heading);font-size:1.4rem;">Cash Payment Selected</h3>
+          <p style="color:var(--text-light);margin:12px 0 20px;">
+            Please pay <strong style="color:var(--primary);font-size:1.2rem;" id="cashAmount">₹0</strong><br>
+            to our staff when your food is delivered.
+          </p>
+          <div class="spinner" style="border-top-color:var(--primary);"></div>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-top:12px;">Confirming your order...</p>
+        </div>
+      </div>
+
+      <!-- Step 4: Confirmation -->
+      <div id="confirmStep" style="display:none;">
+        <div class="confirmed-card">
+          <div class="check-circle">✓</div>
+          <h2>Order Confirmed!</h2>
+          <p style="color:var(--text-light);">Thank you for ordering with LaNature</p>
+          <div class="confirmed-details">
+            <div class="detail-row">
+              <span>Order ID</span>
+              <span id="confOrderId">#0000</span>
+            </div>
+            <div class="detail-row">
+              <span>Location</span>
+              <span id="confLocation">Table 1</span>
+            </div>
+            <div class="detail-row">
+              <span>Customer</span>
+              <span id="confCustomer">—</span>
+            </div>
+            <div class="detail-row">
+              <span>Payment</span>
+              <span id="confPayment">—</span>
+            </div>
+            <div class="detail-row">
+              <span>Total</span>
+              <span id="confTotal" style="color:var(--primary);">₹0</span>
+            </div>
+            <div class="detail-row">
+              <span>Estimated Delivery</span>
+              <span style="color:var(--accent);">20 – 30 minutes</span>
+            </div>
+          </div>
+          <p style="margin-top:16px;font-size:0.9rem;color:var(--text-light);">
+            Our chefs are preparing your food with love 🧑‍🍳<br>
+            Sit back, relax, and enjoy the ambiance!
+          </p>
+          <a href="index.html" class="btn btn-green" style="margin-top:20px;">← Back to Home</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const pendingOrder = JSON.parse(sessionStorage.getItem('lanature_pending_order'));
+
+    if (!pendingOrder) {
+      document.getElementById('paymentStep').innerHTML = `
+        <div class="payment-card" style="text-align:center;">
+          <div style="font-size:3rem;margin-bottom:16px;">🛒</div>
+          <h2>No Pending Order</h2>
+          <p style="color:var(--text-light);margin:12px 0 20px;">Looks like you haven't placed an order yet.</p>
+          <a href="menu.html?table=1" class="btn btn-green">Browse Menu →</a>
+        </div>`;
+    } else {
+      // Render summary
+      const summaryItems = document.getElementById('summaryItems');
+      summaryItems.innerHTML = pendingOrder.items.map(item => `
+        <div class="order-summary-item">
+          <span class="item-name">${item.name} × ${item.qty}</span>
+          <span class="item-price">₹${item.price * item.qty}</span>
+        </div>
+      `).join('');
+      document.getElementById('summaryTotal').textContent = '₹' + pendingOrder.total;
+      document.getElementById('cashAmount').textContent = '₹' + pendingOrder.total;
+    }
+
+    function showConfirmation(method) {
+      pendingOrder.paymentMethod = method;
+      pendingOrder.status = 'new';
+      saveOrder(pendingOrder);
+      sessionStorage.removeItem('lanature_pending_order');
+
+      document.getElementById('confOrderId').textContent = '#' + pendingOrder.id;
+      document.getElementById('confLocation').textContent = pendingOrder.locationType + ' ' + pendingOrder.locationNumber;
+      document.getElementById('confCustomer').textContent = pendingOrder.customer;
+      document.getElementById('confPayment').textContent = method === 'online' ? '💳 Paid Online' : '💵 Cash on Delivery';
+      document.getElementById('confTotal').textContent = '₹' + pendingOrder.total;
+
+      document.getElementById('paymentStep').style.display = 'none';
+      document.getElementById('onlinePayStep').style.display = 'none';
+      document.getElementById('cashPayStep').style.display = 'none';
+      document.getElementById('confirmStep').style.display = 'block';
+    }
+
+    function payOnline() {
+      document.getElementById('paymentStep').style.display = 'none';
+      document.getElementById('onlinePayStep').style.display = 'block';
+      // Simulate processing
+      setTimeout(() => {
+        document.getElementById('paymentSim').innerHTML = `
+          <div style="font-size:4rem;margin-bottom:16px;animation:popIn 0.5s ease-out;">✅</div>
+          <h3 style="font-family:var(--font-heading);color:var(--primary);">Payment Successful!</h3>
+          <p style="color:var(--text-light);margin-top:8px;">₹${pendingOrder.total} paid successfully</p>
+        `;
+        setTimeout(() => showConfirmation('online'), 1500);
+      }, 2500);
+    }
+
+    function payCash() {
+      document.getElementById('paymentStep').style.display = 'none';
+      document.getElementById('cashPayStep').style.display = 'block';
+      setTimeout(() => showConfirmation('cash'), 2000);
+    }
+  </script>
+</body>
+</html>
