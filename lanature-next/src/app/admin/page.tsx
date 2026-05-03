@@ -54,6 +54,8 @@ export default function AdminPage() {
   const [qrNumber, setQrNumber] = useState('1');
   const [showQrResult, setShowQrResult] = useState(false);
   const [qrToken, setQrToken] = useState('');
+  const [qrTimestamp, setQrTimestamp] = useState(0);
+  const [bulkTimestamp, setBulkTimestamp] = useState(0);
   const [bulkType, setBulkType] = useState('table');
   const [bulkCount, setBulkCount] = useState('10');
   const [showBulk, setShowBulk] = useState(false);
@@ -188,11 +190,12 @@ export default function AdminPage() {
 
   const generateQR = () => {
     setQrToken(generateToken());
+    setQrTimestamp(Date.now());
     setShowQrResult(true);
   };
 
-  const getQRUrl = (type: string, num: string, token: string) => {
-    return `${getBaseUrl()}/order?type=${type}&id=${num}&token=${token}&t=${Date.now()}`;
+  const getQRUrl = (type: string, num: string, token: string, ts: number) => {
+    return `${getBaseUrl()}/order?type=${type}&id=${num}&token=${token}&t=${ts}`;
   };
 
   const downloadQR = () => {
@@ -219,6 +222,7 @@ export default function AdminPage() {
     const tokens: string[] = [];
     for (let i = 0; i < count; i++) tokens.push(generateToken());
     setBulkTokens(tokens);
+    setBulkTimestamp(Date.now());
     setShowBulk(true);
   };
 
@@ -582,7 +586,7 @@ export default function AdminPage() {
                 <h4 className="font-heading text-lg mb-1">{(qrType === 'table' ? 'Table ' : 'Room ') + qrNumber}</h4>
                 <div className="flex justify-center mb-4">
                   <QRCodeCanvas
-                    value={getQRUrl(qrType, qrNumber, qrToken)}
+                    value={getQRUrl(qrType, qrNumber, qrToken, qrTimestamp)}
                     size={200}
                     fgColor="#1A1A1A"
                     bgColor="#FFFFFF"
@@ -592,7 +596,7 @@ export default function AdminPage() {
                 <div className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold mb-3">
                   🔒 GPS Secured • Unique Token
                 </div>
-                <p className="text-xs text-text-light break-all mb-4">{getQRUrl(qrType, qrNumber, qrToken)}</p>
+                <p className="text-xs text-text-light break-all mb-4">{getQRUrl(qrType, qrNumber, qrToken, qrTimestamp)}</p>
                 <div className="flex gap-3">
                   <button onClick={printQR} className="flex-1 py-2.5 rounded-[12px] text-sm font-semibold bg-gradient-to-br from-accent to-accent-dark text-dark">🖨 Print QR</button>
                   <button onClick={downloadQR} className="flex-1 py-2.5 rounded-[12px] text-sm font-semibold border-2 border-primary text-primary hover:bg-primary hover:text-white transition-colors">⬇ Download</button>
@@ -640,7 +644,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   {Array.from({ length: Math.min(parseInt(bulkCount) || 5, 20) }, (_, i) => i + 1).map(num => {
                     const token = bulkTokens[num - 1] || generateToken();
-                    const url = getQRUrl(bulkType, num.toString(), token);
+                    const url = getQRUrl(bulkType, num.toString(), token, bulkTimestamp);
                     const lbl = (bulkType === 'table' ? 'Table ' : 'Room ') + num;
                     return (
                       <div key={num} className="text-center p-4 bg-bg-warm rounded-[12px]" id={`bulk-qr-${num}`}>
