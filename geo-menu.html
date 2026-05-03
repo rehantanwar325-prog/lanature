@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel Geo-Fenced QR Menu System</title>
+<meta name="description" content="Hotel restaurant geo-fenced QR menu system with admin panel and customer menu.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+/* ====== RESET & BASE ====== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#c9a84c;--gold-light:#e3c96e;--gold-dark:#a8893a;
+  --bg:#0a0a08;--bg2:#141210;--bg3:#1c1a16;--bg4:#252320;
+  --card:#1a1814;--card-hover:#221f1a;--border:#2a2722;
+  --text:#f0ece4;--text-mid:#b8b0a0;--text-dim:#706a5e;
+  --green:#2ecc71;--green-dark:#27ae60;--red:#e74c3c;--red-dark:#c0392b;
+  --orange:#f39c12;
+  --radius:14px;--radius-sm:10px;
+  --shadow:0 8px 32px rgba(0,0,0,0.4);
+  --shadow-gold:0 4px 20px rgba(201,168,76,0.15);
+  --font-head:'Playfair Display',Georgia,serif;
+  --font-body:'DM Sans','Segoe UI',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--gold);text-decoration:none}
+img{max-width:100%;display:block}
+
+/* ====== SCROLLBAR ====== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--gold-dark);border-radius:10px}
+
+/* ====== UTILITY ====== */
+.container{max-width:1100px;margin:0 auto;padding:0 20px}
+.gold{color:var(--gold)}
+.text-center{text-align:center}
+
+/* ====== ANIMATIONS ====== */
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0;pointer-events:none}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+@keyframes glow{0%,100%{box-shadow:0 0 5px var(--gold),0 0 10px rgba(201,168,76,.2)}50%{box-shadow:0 0 15px var(--gold),0 0 30px rgba(201,168,76,.3)}}
+
+/* ====================================================================
+   ADMIN PANEL STYLES
+   ==================================================================== */
+.admin-header{
+  background:linear-gradient(135deg,var(--bg2) 0%,var(--bg3) 100%);
+  border-bottom:1px solid var(--border);padding:30px 0;text-align:center;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);
+}
+.admin-header h1{font-family:var(--font-head);font-size:2rem;color:var(--gold);letter-spacing:1px}
+.admin-header p{color:var(--text-dim);font-size:.9rem;margin-top:4px}
+
+.admin-section{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:28px;margin-bottom:24px;animation:fadeIn .5s ease both;
+}
+.admin-section h2{font-family:var(--font-head);font-size:1.3rem;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:.85rem;color:var(--text-mid);margin-bottom:6px;font-weight:500}
+.form-input{
+  width:100%;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-size:.95rem;font-family:var(--font-body);
+  transition:all .3s ease;outline:none;
+}
+.form-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.1)}
+.form-input::placeholder{color:var(--text-dim)}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:500px){.form-row{grid-template-columns:1fr}}
+
+/* Slider */
+.slider-wrapper{position:relative;padding:8px 0}
+.slider-wrapper input[type=range]{
+  -webkit-appearance:none;width:100%;height:6px;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold) 0%,var(--bg2) 100%);outline:none;cursor:pointer;
+}
+.slider-wrapper input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:var(--gold);border:3px solid var(--bg);cursor:pointer;box-shadow:var(--shadow-gold);
+}
+.slider-value{
+  display:inline-block;background:var(--gold);color:var(--bg);padding:3px 12px;
+  border-radius:20px;font-size:.8rem;font-weight:700;margin-left:10px;
+}
+
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border:none;
+  border-radius:var(--radius-sm);font-family:var(--font-body);font-size:.9rem;font-weight:600;
+  cursor:pointer;transition:all .3s ease;outline:none;
+}
+.btn-gold{background:linear-gradient(135deg,var(--gold) 0%,var(--gold-dark) 100%);color:var(--bg)}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:var(--shadow-gold)}
+.btn-outline{background:transparent;border:2px solid var(--gold);color:var(--gold)}
+.btn-outline:hover{background:var(--gold);color:var(--bg)}
+.btn-green{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff}
+.btn-green:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(46,204,113,.3)}
+.btn-red{background:linear-gradient(135deg,var(--red) 0%,var(--red-dark) 100%);color:#fff}
+.btn-red:hover{transform:translateY(-2px)}
+.btn-sm{padding:8px 16px;font-size:.8rem}
+.btn:active{transform:scale(.97)}
+
+.gps-status{
+  display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:var(--radius-sm);
+  font-size:.85rem;margin-top:12px;
+}
+.gps-status.success{background:rgba(46,204,113,.1);color:var(--green);border:1px solid rgba(46,204,113,.2)}
+.gps-status.error{background:rgba(231,76,60,.1);color:var(--red);border:1px solid rgba(231,76,60,.2)}
+
+/* Table Cards */
+.tables-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:20px}
+.table-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;text-align:center;animation:scaleIn .4s ease both;position:relative;
+  transition:all .3s ease;
+}
+.table-card:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:var(--shadow-gold)}
+.table-card h3{font-family:var(--font-head);font-size:1.2rem;color:var(--gold);margin-bottom:14px}
+.table-card .qr-box{
+  background:#fff;border-radius:12px;padding:12px;display:inline-block;margin-bottom:14px;
+}
+.table-card .card-actions{display:flex;gap:10px;justify-content:center;margin-top:10px}
+.table-card .url-preview{
+  font-size:.65rem;color:var(--text-dim);word-break:break-all;
+  background:var(--bg);padding:8px;border-radius:8px;margin-top:10px;text-align:left;
+  max-height:60px;overflow-y:auto;display:none;
+}
+.table-card .url-preview.show{display:block}
+
+/* ====================================================================
+   CUSTOMER MENU STYLES
+   ==================================================================== */
+/* Overlays */
+.overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.welcome-overlay{
+  background:linear-gradient(135deg,#0a0a08 0%,#1a1510 50%,#0a0a08 100%);
+}
+.welcome-overlay .welcome-content{
+  text-align:center;animation:scaleIn .6s ease;
+}
+.welcome-overlay .hotel-icon{
+  width:80px;height:80px;border-radius:50%;border:3px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+  margin:0 auto 20px;background:var(--bg3);animation:glow 2s infinite;
+}
+.welcome-overlay h2{font-family:var(--font-head);font-size:1.8rem;color:var(--gold);margin-bottom:8px}
+.welcome-overlay p{color:var(--text-mid);font-size:.95rem}
+.welcome-overlay .loader{
+  width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--gold);
+  border-radius:50%;animation:spin 1s linear infinite;margin:24px auto 10px;
+}
+.welcome-overlay .status-text{color:var(--text-dim);font-size:.85rem}
+
+.blocked-overlay{
+  background:rgba(10,10,8,.97);backdrop-filter:blur(20px);flex-direction:column;
+}
+.blocked-overlay .blocked-content{
+  text-align:center;animation:scaleIn .4s ease;max-width:420px;
+}
+.blocked-icon{
+  width:100px;height:100px;border-radius:50%;
+  background:linear-gradient(135deg,var(--red),var(--red-dark));
+  display:flex;align-items:center;justify-content:center;font-size:2.5rem;
+  margin:0 auto 24px;box-shadow:0 0 40px rgba(231,76,60,.3);
+}
+.blocked-overlay h2{font-family:var(--font-head);font-size:1.6rem;color:var(--red);margin-bottom:12px}
+.blocked-overlay p{color:var(--text-mid);font-size:.95rem;line-height:1.7}
+.distance-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
+  border-radius:20px;font-size:.85rem;font-weight:600;margin-top:16px;
+  background:rgba(231,76,60,.1);color:var(--red);border:1px solid rgba(231,76,60,.2);
+}
+
+/* Menu Header */
+.menu-top-bar{
+  position:sticky;top:0;z-index:100;
+  background:linear-gradient(135deg,var(--bg2),var(--bg3));
+  border-bottom:1px solid var(--border);padding:14px 20px;
+  backdrop-filter:blur(12px);
+}
+.menu-top-inner{
+  max-width:800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
+}
+.menu-hotel-name{font-family:var(--font-head);font-size:1.1rem;color:var(--gold)}
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 14px;
+  border-radius:20px;font-size:.75rem;font-weight:600;
+}
+.live-badge.inside{background:rgba(46,204,113,.12);color:var(--green);border:1px solid rgba(46,204,113,.2)}
+.live-badge.outside{background:rgba(231,76,60,.12);color:var(--red);border:1px solid rgba(231,76,60,.2)}
+.live-dot{width:8px;height:8px;border-radius:50%;animation:pulse 1.5s infinite}
+.live-dot.green{background:var(--green)}
+.live-dot.red{background:var(--red)}
+
+.distance-indicator{
+  text-align:center;padding:10px;font-size:.8rem;color:var(--text-dim);
+  background:var(--bg2);border-bottom:1px solid var(--border);
+}
+.distance-indicator strong{color:var(--gold)}
+
+/* Menu Hero */
+.menu-hero{
+  background:linear-gradient(135deg,var(--bg) 0%,var(--bg3) 50%,var(--bg) 100%);
+  padding:50px 20px 30px;text-align:center;
+  border-bottom:1px solid var(--border);
+}
+.menu-hero h1{font-family:var(--font-head);font-size:2rem;color:var(--gold);margin-bottom:6px}
+.menu-hero p{color:var(--text-dim);font-size:.9rem}
+.table-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 18px;
+  border-radius:20px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);
+  color:var(--gold);font-size:.85rem;font-weight:600;margin-top:14px;
+}
+
+/* Category Tabs */
+.cat-tabs{
+  display:flex;gap:8px;overflow-x:auto;padding:16px 20px;
+  max-width:840px;margin:0 auto;scrollbar-width:none;
+}
+.cat-tabs::-webkit-scrollbar{display:none}
+.cat-tab{
+  flex-shrink:0;padding:9px 20px;border-radius:25px;border:1px solid var(--border);
+  background:var(--bg2);color:var(--text-mid);font-size:.85rem;font-weight:500;
+  cursor:pointer;transition:all .3s ease;white-space:nowrap;
+}
+.cat-tab:hover{border-color:var(--gold);color:var(--gold)}
+.cat-tab.active{background:var(--gold);color:var(--bg);border-color:var(--gold);font-weight:700}
+
+/* Menu Grid */
+.menu-grid{
+  max-width:840px;margin:0 auto;padding:10px 20px 60px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;
+}
+.menu-item{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;transition:all .3s ease;animation:fadeIn .5s ease both;
+}
+.menu-item:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:var(--shadow-gold)}
+.menu-item-img{
+  width:100%;height:160px;object-fit:cover;
+  background:linear-gradient(135deg,var(--bg3),var(--bg2));
+}
+.menu-item-body{padding:16px}
+.menu-item-tags{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.veg-tag,.nonveg-tag{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;
+  font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+}
+.veg-tag{background:rgba(46,204,113,.1);color:var(--green);border:1px solid rgba(46,204,113,.2)}
+.nonveg-tag{background:rgba(231,76,60,.1);color:var(--red);border:1px solid rgba(231,76,60,.2)}
+.popular-tag{
+  padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;
+  background:rgba(243,156,18,.1);color:var(--orange);border:1px solid rgba(243,156,18,.2);
+}
+.menu-item h3{font-family:var(--font-head);font-size:1.05rem;color:var(--text);margin-bottom:4px}
+.menu-item .desc{font-size:.8rem;color:var(--text-dim);line-height:1.5;margin-bottom:12px}
+.menu-item-foot{display:flex;align-items:center;justify-content:space-between}
+.menu-item .price{font-size:1.15rem;font-weight:700;color:var(--gold)}
+
+/* Blurred state */
+.menu-blurred{filter:blur(8px);pointer-events:none;user-select:none;opacity:.3;transition:all .4s ease}
+
+/* Footer */
+.menu-footer{
+  text-align:center;padding:30px 20px;border-top:1px solid var(--border);
+  color:var(--text-dim);font-size:.8rem;
+}
+
+/* ====== RESPONSIVE ====== */
+@media(max-width:600px){
+  .admin-header h1{font-size:1.5rem}
+  .admin-section{padding:20px}
+  .tables-grid{grid-template-columns:1fr}
+  .menu-hero h1{font-size:1.5rem}
+  .menu-grid{grid-template-columns:1fr}
+  .menu-item-img{height:140px}
+}
+</style>
+</head>
+<body>
+
+<script>
+/* ====================================================================
+   HAVERSINE DISTANCE FORMULA
+   ==================================================================== */
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const toRad = deg => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c);
+}
+
+/* ====================================================================
+   URL PARAMS
+   ==================================================================== */
+const params = new URLSearchParams(window.location.search);
+const isMenuView = params.get('view') === 'menu';
+
+/* ====================================================================
+   MENU DATA
+   ==================================================================== */
+const MENU_DATA = [
+  // Starters
+  { id:1,  cat:'starters',   name:'Paneer Tikka',        desc:'Creamy cottage cheese marinated in spices, grilled to perfection in tandoor.', price:249, veg:true,  popular:true,  img:'https://placehold.co/400x200/2D5016/C9A84C?text=Paneer+Tikka' },
+  { id:2,  cat:'starters',   name:'Chicken Seekh Kebab',  desc:'Minced chicken blended with aromatic herbs, skewered and charcoal grilled.', price:299, veg:false, popular:true,  img:'https://placehold.co/400x200/5D1616/C9A84C?text=Seekh+Kebab' },
+  { id:3,  cat:'starters',   name:'Veg Spring Rolls',     desc:'Crispy rolls stuffed with stir-fried vegetables and glass noodles.', price:199, veg:true,  popular:false, img:'https://placehold.co/400x200/2D5016/C9A84C?text=Spring+Rolls' },
+  { id:4,  cat:'starters',   name:'Fish Amritsari',       desc:'Boneless fish coated in a spiced gram flour batter, deep fried until golden.', price:349, veg:false, popular:true,  img:'https://placehold.co/400x200/5D1616/C9A84C?text=Fish+Amritsari' },
+  { id:5,  cat:'starters',   name:'Hara Bhara Kebab',     desc:'Spinach and green pea patties with a hint of mint and chaat masala.', price:189, veg:true,  popular:false, img:'https://placehold.co/400x200/2D5016/C9A84C?text=Hara+Bhara' },
+  // Main Course
+  { id:6,  cat:'main',       name:'Butter Chicken',       desc:'Tender chicken in a rich, creamy tomato-butter gravy. A North Indian classic.', price:349, veg:false, popular:true,  img:'https://placehold.co/400x200/5D1616/C9A84C?text=Butter+Chicken' },
+  { id:7,  cat:'main',       name:'Dal Makhani',          desc:'Black lentils slow-cooked overnight with butter, cream, and aromatic spices.', price:249, veg:true,  popular:true,  img:'https://placehold.co/400x200/2D5016/C9A84C?text=Dal+Makhani' },
+  { id:8,  cat:'main',       name:'Mutton Rogan Josh',    desc:'Kashmiri-style tender mutton braised in a flavorful yogurt-based gravy.', price:449, veg:false, popular:true,  img:'https://placehold.co/400x200/5D1616/C9A84C?text=Rogan+Josh' },
+  { id:9,  cat:'main',       name:'Paneer Butter Masala', desc:'Soft paneer cubes simmered in a velvety makhani gravy with cashew paste.', price:279, veg:true,  popular:false, img:'https://placehold.co/400x200/2D5016/C9A84C?text=Paneer+BM' },
+  { id:10, cat:'main',       name:'Chicken Biryani',      desc:'Fragrant basmati rice layered with spiced chicken, saffron, and fried onions.', price:329, veg:false, popular:true,  img:'https://placehold.co/400x200/5D1616/C9A84C?text=Biryani' },
+  { id:11, cat:'main',       name:'Veg Biryani',          desc:'Aromatic basmati rice with seasonal vegetables, nuts, and whole spices.', price:259, veg:true,  popular:false, img:'https://placehold.co/400x200/2D5016/C9A84C?text=Veg+Biryani' },
+  { id:12, cat:'main',       name:'Garlic Naan',          desc:'Fluffy tandoor-baked bread topped with garlic and fresh coriander.', price:69,  veg:true,  popular:false, img:'https://placehold.co/400x200/2D5016/C9A84C?text=Garlic+Naan' },
+  // Beverages
+  { id:13, cat:'beverages',  name:'Masala Chai',          desc:'Traditional Indian spiced tea brewed with cardamom, ginger, and cloves.', price:59,  veg:true,  popular:true,  img:'https://placehold.co/400x200/3D2B10/C9A84C?text=Masala+Chai' },
+  { id:14, cat:'beverages',  name:'Fresh Lime Soda',      desc:'Refreshing lemon soda — available sweet, salty, or mixed.', price:89,  veg:true,  popular:false, img:'https://placehold.co/400x200/3D2B10/C9A84C?text=Lime+Soda' },
+  { id:15, cat:'beverages',  name:'Mango Lassi',          desc:'Thick and creamy yogurt blended with Alphonso mango pulp and cardamom.', price:129, veg:true,  popular:true,  img:'https://placehold.co/400x200/3D2B10/C9A84C?text=Mango+Lassi' },
+  { id:16, cat:'beverages',  name:'Cold Coffee',          desc:'Chilled coffee blend with ice cream and chocolate drizzle on top.', price:149, veg:true,  popular:false, img:'https://placehold.co/400x200/3D2B10/C9A84C?text=Cold+Coffee' },
+  // Desserts
+  { id:17, cat:'desserts',   name:'Gulab Jamun',          desc:'Soft, golden-fried milk dumplings soaked in warm rose-cardamom syrup.', price:129, veg:true,  popular:true,  img:'https://placehold.co/400x200/4A2D10/C9A84C?text=Gulab+Jamun' },
+  { id:18, cat:'desserts',   name:'Rasmalai',             desc:'Delicate paneer discs immersed in chilled saffron-pistachio cream.', price:149, veg:true,  popular:true,  img:'https://placehold.co/400x200/4A2D10/C9A84C?text=Rasmalai' },
+  { id:19, cat:'desserts',   name:'Brownie with Ice Cream',desc:'Warm fudge brownie served with a scoop of vanilla bean ice cream.', price:199, veg:true,  popular:false, img:'https://placehold.co/400x200/4A2D10/C9A84C?text=Brownie' },
+  { id:20, cat:'desserts',   name:'Phirni',               desc:'Creamy ground rice pudding set in clay pots, flavored with saffron and nuts.', price:109, veg:true,  popular:false, img:'https://placehold.co/400x200/4A2D10/C9A84C?text=Phirni' },
+];
+
+/* ====================================================================
+   RENDER APPROPRIATE VIEW
+   ==================================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  if (isMenuView) {
+    renderCustomerMenu();
+  } else {
+    renderAdminPanel();
+  }
+});
+
+/* ====================================================================
+   ADMIN PANEL
+   ==================================================================== */
+function renderAdminPanel() {
+  document.title = 'Admin Panel — Hotel QR Menu System';
+  let tableCount = 0;
+  const tables = [];
+
+  document.body.innerHTML = `
+    <!-- Header -->
+    <div class="admin-header">
+      <h1>🏨 Hotel QR Menu — Admin Panel</h1>
+      <p>Configure your hotel, set geo-fence, and generate table QR codes</p>
+    </div>
+
+    <div class="container" style="padding-top:30px;padding-bottom:60px;">
+
+      <!-- Hotel Config -->
+      <div class="admin-section" style="animation-delay:.1s">
+        <h2>🏨 Hotel Configuration</h2>
+        <div class="form-group">
+          <label>Hotel Name</label>
+          <input type="text" class="form-input" id="hotelName" placeholder="e.g. LaNature Hotel & Resort" value="LaNature Hotel">
+        </div>
+      </div>
+
+      <!-- GPS / Location -->
+      <div class="admin-section" style="animation-delay:.2s">
+        <h2>📍 GPS Location & Geo-Fence</h2>
+        <button class="btn btn-gold" id="captureGpsBtn" onclick="captureGPS()">📡 Capture GPS Location</button>
+        <div id="gpsStatus"></div>
+        <div class="form-row" style="margin-top:16px">
+          <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" step="any" class="form-input" id="latitude" placeholder="e.g. 31.1048">
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" step="any" class="form-input" id="longitude" placeholder="e.g. 77.1734">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Geo-Fence Radius</label>
+          <div class="slider-wrapper" style="display:flex;align-items:center">
+            <input type="range" id="radiusSlider" min="20" max="300" value="50" oninput="updateRadiusLabel()">
+            <span class="slider-value" id="radiusLabel">50m</span>
+          </div>
+          <p style="font-size:.75rem;color:var(--text-dim);margin-top:6px">
+            Customers outside this radius will be blocked from viewing the menu.
+          </p>
+        </div>
+      </div>
+
+      <!-- Tables -->
+      <div class="admin-section" style="animation-delay:.3s">
+        <h2>🪑 Table Management</h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-green" onclick="addTable()">+ Add Table</button>
+          <button class="btn btn-outline btn-sm" onclick="addMultipleTables()">+ Add 5 Tables</button>
+        </div>
+        <div class="tables-grid" id="tablesGrid"></div>
+        <p id="noTablesMsg" style="text-align:center;color:var(--text-dim);padding:40px 0;font-size:.9rem">
+          No tables added yet. Click "Add Table" to get started.
+        </p>
+      </div>
+
+    </div>
+  `;
+
+  function updateRadiusLabel() {
+    document.getElementById('radiusLabel').textContent = document.getElementById('radiusSlider').value + 'm';
+  }
+
+  // Expose functions globally
+  window.captureGPS = function() {
+    const btn = document.getElementById('captureGpsBtn');
+    const status = document.getElementById('gpsStatus');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Getting Location...';
+    status.innerHTML = '';
+
+    if (!navigator.geolocation) {
+      btn.disabled = false;
+      btn.innerHTML = '📡 Capture GPS Location';
+      status.innerHTML = '<div class="gps-status error">❌ Geolocation is not supported by your browser.</div>';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById('latitude').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('longitude').value = pos.coords.longitude.toFixed(6);
+        btn.disabled = false;
+        btn.innerHTML = '📡 Capture GPS Location';
+        status.innerHTML = `<div class="gps-status success">✅ Location captured! Lat: ${pos.coords.latitude.toFixed(6)}, Lng: ${pos.coords.longitude.toFixed(6)} (Accuracy: ~${Math.round(pos.coords.accuracy)}m)</div>`;
+      },
+      err => {
+        btn.disabled = false;
+        btn.innerHTML = '📡 Capture GPS Location';
+        const msgs = { 1:'Permission denied.', 2:'Location unavailable.', 3:'Request timeout.' };
+        status.innerHTML = `<div class="gps-status error">❌ ${msgs[err.code] || 'Unknown error.'} Please enter coordinates manually.</div>`;
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  window.updateRadiusLabel = updateRadiusLabel;
+
+  window.addTable = function() {
+    const hotel = document.getElementById('hotelName').value.trim();
+    const lat = document.getElementById('latitude').value.trim();
+    const lng = document.getElementById('longitude').value.trim();
+    const radius = document.getElementById('radiusSlider').value;
+
+    if (!hotel) { alert('Please enter a hotel name first.'); return; }
+    if (!lat || !lng) { alert('Please capture or enter GPS coordinates first.'); return; }
+
+    tableCount++;
+    const tableNum = tableCount;
+    const baseUrl = window.location.origin + window.location.pathname;
+    const qrUrl = `${baseUrl}?view=menu&hotel=${encodeURIComponent(hotel)}&table=${tableNum}&lat=${lat}&lng=${lng}&radius=${radius}`;
+
+    const grid = document.getElementById('tablesGrid');
+    document.getElementById('noTablesMsg').style.display = 'none';
+
+    const card = document.createElement('div');
+    card.className = 'table-card';
+    card.id = `table-card-${tableNum}`;
+    card.style.animationDelay = '0s';
+    card.innerHTML = `
+      <h3>🪑 Table ${tableNum}</h3>
+      <div class="qr-box" id="qr-${tableNum}"></div>
+      <div class="card-actions">
+        <button class="btn btn-outline btn-sm" onclick="togglePreview(${tableNum})">👁 Preview</button>
+        <button class="btn btn-red btn-sm" onclick="deleteTable(${tableNum})">🗑 Delete</button>
+      </div>
+      <div class="url-preview" id="url-${tableNum}">${qrUrl}</div>
+    `;
+    grid.appendChild(card);
+
+    // Generate QR Code
+    new QRCode(document.getElementById(`qr-${tableNum}`), {
+      text: qrUrl,
+      width: 180,
+      height: 180,
+      colorDark: '#0a0a08',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H,
+    });
+
+    tables.push(tableNum);
+  };
+
+  window.addMultipleTables = function() {
+    for (let i = 0; i < 5; i++) addTable();
+  };
+
+  window.togglePreview = function(num) {
+    document.getElementById(`url-${num}`).classList.toggle('show');
+  };
+
+  window.deleteTable = function(num) {
+    const card = document.getElementById(`table-card-${num}`);
+    if (card) {
+      card.style.animation = 'fadeOut .3s ease forwards';
+      setTimeout(() => {
+        card.remove();
+        const idx = tables.indexOf(num);
+        if (idx > -1) tables.splice(idx, 1);
+        if (tables.length === 0) document.getElementById('noTablesMsg').style.display = 'block';
+      }, 300);
+    }
+  };
+}
+
+/* ====================================================================
+   CUSTOMER MENU PAGE
+   ==================================================================== */
+function renderCustomerMenu() {
+  const hotelName = params.get('hotel') || 'Hotel';
+  const tableNum = params.get('table') || '1';
+  const hotelLat = parseFloat(params.get('lat')) || 0;
+  const hotelLng = parseFloat(params.get('lng')) || 0;
+  const fenceRadius = parseInt(params.get('radius')) || 50;
+
+  document.title = `Menu — ${hotelName} | Table ${tableNum}`;
+
+  let currentDistance = null;
+  let isInside = false;
+  let geoCheckInterval = null;
+  let menuReady = false;
+
+  // Build HTML
+  document.body.innerHTML = `
+    <!-- Welcome Overlay -->
+    <div class="overlay welcome-overlay" id="welcomeOverlay">
+      <div class="welcome-content">
+        <div class="hotel-icon">🏨</div>
+        <h2>${hotelName}</h2>
+        <p>Table ${tableNum}</p>
+        <div class="loader"></div>
+        <p class="status-text" id="welcomeStatus">Verifying your location...</p>
+      </div>
+    </div>
+
+    <!-- Blocked Overlay -->
+    <div class="overlay blocked-overlay" id="blockedOverlay" style="display:none">
+      <div class="blocked-content">
+        <div class="blocked-icon">🚫</div>
+        <h2>Access Restricted</h2>
+        <p>You are <strong>outside</strong> the hotel geo-fence boundary.<br>Please come inside <strong>${hotelName}</strong> to access the menu.</p>
+        <div class="distance-badge" id="blockedDistance">📏 Calculating...</div>
+        <p style="color:var(--text-dim);font-size:.8rem;margin-top:16px">
+          Allowed radius: <strong style="color:var(--gold)">${fenceRadius}m</strong> from hotel center
+        </p>
+        <button class="btn btn-gold" style="margin-top:24px" onclick="retryLocation()">🔄 Retry Location Check</button>
+      </div>
+    </div>
+
+    <!-- Main Menu Content -->
+    <div id="menuContent" style="display:none">
+
+      <!-- Top Bar -->
+      <div class="menu-top-bar">
+        <div class="menu-top-inner">
+          <span class="menu-hotel-name">✦ ${hotelName}</span>
+          <div class="live-badge inside" id="liveBadge">
+            <span class="live-dot green" id="liveDot"></span>
+            <span id="liveBadgeText">INSIDE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distance Indicator -->
+      <div class="distance-indicator" id="distanceBar">
+        📍 <strong id="distanceText">--</strong> from hotel center
+      </div>
+
+      <!-- Hero -->
+      <div class="menu-hero">
+        <h1>Our Menu</h1>
+        <p>Crafted with love, served with elegance</p>
+        <div class="table-badge">🪑 Table ${tableNum}</div>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="cat-tabs" id="catTabs">
+        <div class="cat-tab active" data-cat="all" onclick="filterCat('all',this)">🍽 All</div>
+        <div class="cat-tab" data-cat="starters" onclick="filterCat('starters',this)">🥘 Starters</div>
+        <div class="cat-tab" data-cat="main" onclick="filterCat('main',this)">🍛 Main Course</div>
+        <div class="cat-tab" data-cat="beverages" onclick="filterCat('beverages',this)">🥤 Beverages</div>
+        <div class="cat-tab" data-cat="desserts" onclick="filterCat('desserts',this)">🍮 Desserts</div>
+      </div>
+
+      <!-- Menu Grid -->
+      <div class="menu-grid" id="menuGrid"></div>
+
+      <!-- Footer -->
+      <div class="menu-footer">
+        <p>✦ ${hotelName} — Table ${tableNum} ✦</p>
+        <p style="margin-top:4px">Powered by Geo-Fenced QR Menu System</p>
+      </div>
+    </div>
+  `;
+
+  // Render Menu
+  function renderMenuItems(cat) {
+    const items = cat === 'all' ? MENU_DATA : MENU_DATA.filter(i => i.cat === cat);
+    const grid = document.getElementById('menuGrid');
+    grid.innerHTML = items.map((item, idx) => `
+      <div class="menu-item" style="animation-delay:${idx * 0.05}s">
+        <img src="${item.img}" alt="${item.name}" class="menu-item-img"
+             onerror="this.style.display='none'">
+        <div class="menu-item-body">
+          <div class="menu-item-tags">
+            ${item.veg
+              ? '<span class="veg-tag">● VEG</span>'
+              : '<span class="nonveg-tag">▲ NON-VEG</span>'}
+            ${item.popular ? '<span class="popular-tag">⭐ Popular</span>' : ''}
+          </div>
+          <h3>${item.name}</h3>
+          <p class="desc">${item.desc}</p>
+          <div class="menu-item-foot">
+            <span class="price">₹${item.price}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.filterCat = function(cat, el) {
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderMenuItems(cat);
+  };
+
+  // --- GEO VERIFICATION ---
+  function checkLocation() {
+    if (!navigator.geolocation) {
+      showBlocked('GPS not supported by your browser.', '--');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, hotelLat, hotelLng);
+        currentDistance = dist;
+        updateDistanceUI(dist);
+
+        if (dist <= fenceRadius) {
+          grantAccess(dist);
+        } else {
+          revokeAccess(dist);
+        }
+      },
+      err => {
+        const msgs = { 1:'Location permission denied.', 2:'Location unavailable.', 3:'Location timeout.' };
+        document.getElementById('welcomeStatus').textContent = msgs[err.code] || 'Location error.';
+        setTimeout(() => showBlocked(msgs[err.code] || 'Cannot get location.', '--'), 1500);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
+
+  function grantAccess(dist) {
+    isInside = true;
+
+    // Hide welcome overlay
+    const welcome = document.getElementById('welcomeOverlay');
+    if (welcome && welcome.style.display !== 'none') {
+      welcome.style.animation = 'fadeOut .6s ease forwards';
+      setTimeout(() => { welcome.style.display = 'none'; }, 600);
+    }
+
+    // Hide blocked overlay
+    document.getElementById('blockedOverlay').style.display = 'none';
+
+    // Show menu
+    const content = document.getElementById('menuContent');
+    content.style.display = 'block';
+    content.classList.remove('menu-blurred');
+
+    if (!menuReady) {
+      renderMenuItems('all');
+      menuReady = true;
+    }
+
+    // Update badge
+    const badge = document.getElementById('liveBadge');
+    badge.className = 'live-badge inside';
+    document.getElementById('liveDot').className = 'live-dot green';
+    document.getElementById('liveBadgeText').textContent = 'INSIDE';
+
+    // Start continuous monitoring
+    if (!geoCheckInterval) {
+      geoCheckInterval = setInterval(checkLocation, 10000);
+    }
+  }
+
+  function revokeAccess(dist) {
+    isInside = false;
+
+    // Hide welcome
+    const welcome = document.getElementById('welcomeOverlay');
+    if (welcome) welcome.style.display = 'none';
+
+    // Show blocked
+    showBlocked(null, dist);
+
+    // Blur menu if it was showing
+    const content = document.getElementById('menuContent');
+    if (content.style.display === 'block') {
+      content.classList.add('menu-blurred');
+    }
+
+    // Update badge
+    const badge = document.getElementById('liveBadge');
+    if (badge) {
+      badge.className = 'live-badge outside';
+      document.getElementById('liveDot').className = 'live-dot red';
+      document.getElementById('liveBadgeText').textContent = 'OUTSIDE';
+    }
+
+    // Keep monitoring
+    if (!geoCheckInterval) {
+      geoCheckInterval = setInterval(checkLocation, 10000);
+    }
+  }
+
+  function showBlocked(msg, dist) {
+    const overlay = document.getElementById('blockedOverlay');
+    overlay.style.display = 'flex';
+    if (dist !== '--' && dist !== undefined) {
+      document.getElementById('blockedDistance').textContent = `📏 You are ${dist}m away (limit: ${fenceRadius}m)`;
+    }
+  }
+
+  function updateDistanceUI(dist) {
+    const el = document.getElementById('distanceText');
+    if (el) el.textContent = `${dist}m`;
+  }
+
+  window.retryLocation = function() {
+    document.getElementById('blockedOverlay').style.display = 'none';
+    const welcome = document.getElementById('welcomeOverlay');
+    welcome.style.display = 'flex';
+    welcome.style.animation = '';
+    welcome.style.opacity = '1';
+    document.getElementById('welcomeStatus').textContent = 'Rechecking your location...';
+    setTimeout(checkLocation, 500);
+  };
+
+  // Start initial check
+  checkLocation();
+}
+</script>
+</body>
+</html>
