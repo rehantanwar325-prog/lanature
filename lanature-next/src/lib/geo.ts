@@ -46,37 +46,90 @@ export function isWithinRange(
 export function getCurrentPosition(): Promise<GeoCoords> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('GPS_NOT_SUPPORTED'));
+      // Browser doesn't support GPS, try IP fallback directly
+      fetchIpLocation().then(resolve).catch(() => reject(new Error('GPS_NOT_SUPPORTED')));
       return;
     }
 
+    let isResolved = false;
+
+    // Strict manual timeout because browser timeout doesn't fire if user ignores prompt
+    const timeoutId = setTimeout(() => {
+      if (!isResolved) {
+        isResolved = true;
+        // Try IP fallback
+        fetchIpLocation()
+          .then(resolve)
+          .catch(() => reject(new Error('GPS_TIMEOUT')));
+      }
+    }, 10000); // 10 seconds strict timeout
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeoutId);
+          resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        }
       },
       (err) => {
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            reject(new Error('GPS_DENIED'));
-            break;
-          case err.POSITION_UNAVAILABLE:
-            reject(new Error('GPS_UNAVAILABLE'));
-            break;
-          case err.TIMEOUT:
-            reject(new Error('GPS_TIMEOUT'));
-            break;
-          default:
-            reject(new Error('GPS_ERROR'));
+        if (!isResolved) {
+          isResolved = true;
+          clearTimeout(timeoutId);
+          // On explicit error, try IP fallback first
+          fetchIpLocation()
+            .then(resolve)
+            .catch(() => {
+              switch (err.code) {
+                case err.PERMISSION_DENIED:
+                  reject(new Error('GPS_DENIED'));
+                  break;
+                case err.POSITION_UNAVAILABLE:
+                  reject(new Error('GPS_UNAVAILABLE'));
+                  break;
+                case err.TIMEOUT:
+                  reject(new Error('GPS_TIMEOUT'));
+                  break;
+                default:
+                  reject(new Error('GPS_ERROR'));
+              }
+            });
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 8000,
         maximumAge: 30000,
       }
     );
   });
+}
+
+/**
+ * Fallback to IP-based location if GPS fails or times out.
+ */
+async function fetchIpLocation(): Promise<GeoCoords> {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) throw new Error('IP_FETCH_FAILED');
+    const data = await res.json();
+    if (data.latitude && data.longitude) {
+      return { lat: data.latitude, lng: data.longitude };
+    }
+    throw new Error('INVALID_IP_DATA');
+  } catch (err) {
+    try {
+      const res2 = await fetch('https://ip-api.com/json/?fields=lat,lon,status');
+      const data2 = await res2.json();
+      if (data2.status === 'success' && data2.lat && data2.lon) {
+        return { lat: data2.lat, lng: data2.lon };
+      }
+      throw new Error('INVALID_IP_DATA_2');
+    } catch (err2) {
+      throw new Error('IP_FALLBACK_FAILED');
+    }
+  }
 }
