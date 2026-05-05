@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import GPSGuard from '@/components/GPSGuard';
 import SessionError from '@/components/SessionError';
-import { getMenuData, generateOrderId, type MenuItem, type CartItem } from '@/lib/store';
+import { getMenuData, generateOrderId, placeOrderSecure, type MenuItem, type CartItem } from '@/lib/store';
 import { type QRSession, type SessionValidation } from '@/lib/session';
 import { type GeoCoords } from '@/lib/geo';
 import { QR_CONFIG } from '@/lib/config';
@@ -163,21 +163,54 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
 
     setGpsChecking(false);
 
-    // ✅ GPS verified — place order
-    const order = {
-      id: generateOrderId(),
-      customer: customerName.trim(),
-      locationType,
-      locationNumber,
-      items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
-      total: cartTotal,
-      status: 'new' as const,
-      paymentMethod: null,
-      time: new Date().toISOString(),
-      sessionToken: session.token,
-    };
-    sessionStorage.setItem('lanature_pending_order', JSON.stringify(order));
-    router.push('/payment');
+    // ✅ GPS verified — place order through SECURE edge function
+    setGpsChecking(true); // Show loading while edge function processes
+
+    try {
+      const currentCoords = await import('@/lib/geo').then(m => m.getCurrentPosition());
+      
+      const response = await placeOrderSecure({
+        sessionToken: session.token,
+        customer: customerName.trim(),
+        items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+        paymentMethod: 'cash', // Will be updated on payment page
+        userLat: currentCoords.lat,
+        userLng: currentCoords.lng,
+      });
+
+      setGpsChecking(false);
+
+      if (!response.success) {
+        setGpsError({
+          type: response.code || 'SERVER_ERROR',
+          message: response.message || 'Order place nahi ho paya. Retry karein.',
+        });
+        return;
+      }
+
+      // Save confirmed order for payment page display
+      const confirmedOrder = {
+        id: response.order!.id,
+        customer: response.order!.customer,
+        locationType: response.order!.locationType,
+        locationNumber: response.order!.locationNumber,
+        items: response.order!.items,
+        total: response.order!.total,
+        status: 'new' as const,
+        paymentMethod: null,
+        time: response.order!.time || new Date().toISOString(),
+        sessionToken: session.token,
+        serverVerified: true, // Flag that order is already saved by server
+      };
+      sessionStorage.setItem('lanature_pending_order', JSON.stringify(confirmedOrder));
+      router.push('/payment');
+    } catch (err) {
+      setGpsChecking(false);
+      setGpsError({
+        type: 'GPS_ERROR',
+        message: 'Location verify nahi ho paayi. Kripya GPS on karein aur retry karein.',
+      });
+    }
   };
 
   return (

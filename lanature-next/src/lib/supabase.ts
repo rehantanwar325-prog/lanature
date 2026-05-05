@@ -296,14 +296,114 @@ export async function fetchHotelSettings(): Promise<DBHotelSettings | null> {
 export async function updateHotelSettings(
   settings: Partial<Omit<DBHotelSettings, 'id' | 'updated_at'>>
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from('hotel_settings')
-    .update({ ...settings, updated_at: new Date().toISOString() })
-    .eq('id', 1);
+  // Now routes through admin edge function (RLS blocks direct update)
+  return adminAction('update_settings', { settings });
+}
 
-  if (error) {
-    console.error('updateHotelSettings error:', error);
+/* ─────────────────────────────────────────────
+   SECURE EDGE FUNCTION CALLS
+   ───────────────────────────────────────────── */
+
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1`;
+
+export interface SecureOrderRequest {
+  sessionToken: string;
+  customer: string;
+  items: { name: string; qty: number; price: number }[];
+  paymentMethod: 'online' | 'cash';
+  userLat?: number;
+  userLng?: number;
+}
+
+export interface SecureOrderResponse {
+  success: boolean;
+  order?: {
+    id: number;
+    customer: string;
+    locationType: string;
+    locationNumber: string;
+    items: { name: string; qty: number; price: number }[];
+    total: number;
+    status: string;
+    paymentMethod: string;
+    time: string;
+  };
+  error?: boolean;
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Place order through server-side edge function.
+ * Validates session, checks GPS, verifies menu prices server-side.
+ */
+export async function placeOrderSecure(data: SecureOrderRequest): Promise<SecureOrderResponse> {
+  try {
+    const res = await fetch(`${EDGE_FUNCTION_URL}/place-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('placeOrderSecure error:', err);
+    return { success: false, error: true, code: 'NETWORK_ERROR', message: 'Network error. Please try again.' };
+  }
+}
+
+/**
+ * Execute admin actions through server-side edge function.
+ * Requires admin credentials. Uses service_role key on server.
+ */
+export async function adminAction(action: string, payload?: Record<string, unknown>): Promise<boolean> {
+  try {
+    // Get admin credentials from sessionStorage
+    const adminCreds = sessionStorage.getItem('lanature_admin_creds');
+    let adminUser = 'admin';
+    let adminPass = 'lanature123';
+    if (adminCreds) {
+      const creds = JSON.parse(adminCreds);
+      adminUser = creds.user;
+      adminPass = creds.pass;
+    }
+
+    const res = await fetch(`${EDGE_FUNCTION_URL}/admin-action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminUser, adminPass, action, payload }),
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch (err) {
+    console.error('adminAction error:', err);
     return false;
   }
-  return true;
+}
+
+/**
+ * Admin action that returns data (for add_menu_item etc.)
+ */
+export async function adminActionWithData<T>(action: string, payload?: Record<string, unknown>): Promise<T | null> {
+  try {
+    const adminCreds = sessionStorage.getItem('lanature_admin_creds');
+    let adminUser = 'admin';
+    let adminPass = 'lanature123';
+    if (adminCreds) {
+      const creds = JSON.parse(adminCreds);
+      adminUser = creds.user;
+      adminPass = creds.pass;
+    }
+
+    const res = await fetch(`${EDGE_FUNCTION_URL}/admin-action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminUser, adminPass, action, payload }),
+    });
+    const data = await res.json();
+    if (data.success) return data as T;
+    return null;
+  } catch (err) {
+    console.error('adminActionWithData error:', err);
+    return null;
+  }
 }

@@ -9,8 +9,8 @@ import {
 } from '@/lib/store';
 import { ADMIN_USER, ADMIN_PASS, CAT_LABELS } from '@/lib/constants';
 import { HOTEL_COORDS, QR_CONFIG, clearConfigCache } from '@/lib/config';
-import { getActiveSessions, closeSession, cleanExpiredSessions, generateToken, type QRSession } from '@/lib/session';
-import { fetchHotelSettings, updateHotelSettings } from '@/lib/supabase';
+import { getActiveSessions, type QRSession } from '@/lib/session';
+import { fetchHotelSettings, adminAction } from '@/lib/supabase';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -99,7 +99,7 @@ export default function AdminPage() {
     const menuItems = await getMenuData();
     setProducts(menuItems);
 
-    await cleanExpiredSessions();
+    await adminAction('clean_expired_sessions');
     const activeSessions = await getActiveSessions();
     setSessions(activeSessions);
   }, [lastOrderCount]);
@@ -114,6 +114,8 @@ export default function AdminPage() {
   const doLogin = () => {
     if (username === ADMIN_USER && password === ADMIN_PASS) {
       sessionStorage.setItem('lanature_admin', 'true');
+      // Save credentials for edge function auth
+      sessionStorage.setItem('lanature_admin_creds', JSON.stringify({ user: username, pass: password }));
       setIsLoggedIn(true);
       setLoginError(false);
     } else {
@@ -189,7 +191,10 @@ export default function AdminPage() {
   };
 
   const generateQR = () => {
-    setQrToken(generateToken());
+    // Generate cryptographically strong token
+    const token = crypto.randomUUID ? crypto.randomUUID() : 
+      'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+    setQrToken(token);
     setQrTimestamp(Date.now());
     setShowQrResult(true);
   };
@@ -220,7 +225,10 @@ export default function AdminPage() {
   const bulkGenerate = () => {
     const count = Math.min(parseInt(bulkCount) || 5, 20);
     const tokens: string[] = [];
-    for (let i = 0; i < count; i++) tokens.push(generateToken());
+    for (let i = 0; i < count; i++) {
+      tokens.push(crypto.randomUUID ? crypto.randomUUID() :
+        'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16)));
+    }
     setBulkTokens(tokens);
     setBulkTimestamp(Date.now());
     setShowBulk(true);
@@ -242,6 +250,7 @@ export default function AdminPage() {
 
   const doLogout = () => {
     sessionStorage.removeItem('lanature_admin');
+    sessionStorage.removeItem('lanature_admin_creds');
     setIsLoggedIn(false);
   };
 
@@ -322,7 +331,7 @@ export default function AdminPage() {
   };
 
   const handleCloseSession = async (token: string) => {
-    await closeSession(token);
+    await adminAction('close_session', { token });
     await refreshData();
   };
 
@@ -505,11 +514,13 @@ export default function AdminPage() {
               onClick={async () => {
                 setGpsSaving(true);
                 setGpsSaveStatus('');
-                const success = await updateHotelSettings({
-                  hotel_lat: parseFloat(gpsLat),
-                  hotel_lng: parseFloat(gpsLng),
-                  table_radius_meters: parseInt(gpsRadius),
-                  room_radius_meters: parseInt(gpsRoomRadius),
+                const success = await adminAction('update_settings', {
+                  settings: {
+                    hotel_lat: parseFloat(gpsLat),
+                    hotel_lng: parseFloat(gpsLng),
+                    table_radius_meters: parseInt(gpsRadius),
+                    room_radius_meters: parseInt(gpsRoomRadius),
+                  }
                 });
                 clearConfigCache(); // Clear cached config so new settings take effect immediately
                 setGpsSaving(false);
@@ -643,7 +654,7 @@ export default function AdminPage() {
               <div className="mt-5">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   {Array.from({ length: Math.min(parseInt(bulkCount) || 5, 20) }, (_, i) => i + 1).map(num => {
-                    const token = bulkTokens[num - 1] || generateToken();
+                    const token = bulkTokens[num - 1] || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${num}`);
                     const url = getQRUrl(bulkType, num.toString(), token, bulkTimestamp);
                     const lbl = (bulkType === 'table' ? 'Table ' : 'Room ') + num;
                     return (

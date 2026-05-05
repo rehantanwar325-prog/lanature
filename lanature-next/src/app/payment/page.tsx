@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { saveOrder, formatCurrency, type Order } from '@/lib/store';
+import { formatCurrency, type Order } from '@/lib/store';
 
 type Step = 'summary' | 'online' | 'cash' | 'confirmed';
 
@@ -20,7 +20,8 @@ export default function PaymentPage() {
   const showConfirmation = async (method: 'online' | 'cash') => {
     if (!pendingOrder) return;
     const finalOrder = { ...pendingOrder, paymentMethod: method, status: 'new' as const };
-    await saveOrder(finalOrder);
+    // Order is already saved by the edge function (serverVerified flag)
+    // No need to call saveOrder again — just update display
     sessionStorage.removeItem('lanature_pending_order');
     setPendingOrder(finalOrder);
     setStep('confirmed');

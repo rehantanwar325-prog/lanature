@@ -18,9 +18,34 @@ type GuardState =
   | { status: 'error'; errorType: SessionErrorType; errorMsg?: string; distance?: number }
   | { status: 'ready'; session: QRSession; coords: GeoCoords };
 
+// ─── Device Fingerprint (anti-sharing) ───
+function generateDeviceFingerprint(): string {
+  const parts: string[] = [];
+  parts.push(navigator.userAgent);
+  parts.push(`${screen.width}x${screen.height}x${screen.colorDepth}`);
+  parts.push(Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+  parts.push(navigator.language);
+  parts.push(String(navigator.hardwareConcurrency || 0));
+  // Simple hash
+  const str = parts.join('|');
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return `fp_${Math.abs(hash).toString(36)}`;
+}
+
+// ─── GPS Re-check interval (2 minutes) ───
+const GPS_RECHECK_INTERVAL_MS = 2 * 60 * 1000;
+
 export default function GPSGuard({ qrType, qrId, token, children }: GPSGuardProps) {
   const [state, setState] = useState<GuardState>({ status: 'loading', message: 'Location detect ho rahi hai...', step: 1 });
+  const [gpsWarning, setGpsWarning] = useState<string | null>(null);
   const hasStarted = useRef(false);
+  const recheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const deviceFingerprint = useRef<string>('');
 
   const validate = useCallback(async () => {
     try {
@@ -40,6 +65,11 @@ export default function GPSGuard({ qrType, qrId, token, children }: GPSGuardProp
         const errMsg = (err as Error).message as SessionErrorType;
         setState({ status: 'error', errorType: errMsg || 'GPS_ERROR' });
         return;
+      }
+
+      // Generate device fingerprint
+      if (!deviceFingerprint.current) {
+        deviceFingerprint.current = generateDeviceFingerprint();
       }
 
       // 3. Check local storage for an active session
@@ -86,6 +116,45 @@ export default function GPSGuard({ qrType, qrId, token, children }: GPSGuardProp
       validate();
     }
   }, [validate]);
+
+  // ─── Periodic GPS Re-check (every 2 minutes) ───
+  useEffect(() => {
+    if (state.status !== 'ready') return;
+
+    const doRecheck = async () => {
+      try {
+        const coords = await getCurrentPosition();
+        const result = await validateSession(state.session.token, coords);
+
+        if (!result.valid) {
+          // Session expired or out of range — show error
+          if (result.reason === 'EXPIRED') {
+            setState({
+              status: 'error',
+              errorType: 'EXPIRED',
+              errorMsg: result.message,
+            });
+          } else if (result.reason === 'OUT_OF_RANGE') {
+            setGpsWarning(`⚠️ Aap hotel area se ${result.distance}m door hain. Order karne ke liye wapas aayen.`);
+          } else {
+            setGpsWarning(null);
+          }
+        } else {
+          setGpsWarning(null); // All good
+        }
+      } catch {
+        setGpsWarning('⚠️ GPS check nahi ho paaya. Location on rakhein.');
+      }
+    };
+
+    recheckInterval.current = setInterval(doRecheck, GPS_RECHECK_INTERVAL_MS);
+
+    return () => {
+      if (recheckInterval.current) {
+        clearInterval(recheckInterval.current);
+      }
+    };
+  }, [state]);
 
   /**
    * Re-validate before placing order.
@@ -161,6 +230,22 @@ export default function GPSGuard({ qrType, qrId, token, children }: GPSGuardProp
     );
   }
 
-  // ─── Ready — render children with session data ───
-  return <>{children({ session: state.session, coords: state.coords, revalidate })}</>;
+  // ─── Ready — render children with session data + GPS warning banner ───
+  return (
+    <>
+      {/* GPS Warning Banner (shows when periodic recheck detects issue) */}
+      {gpsWarning && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-3 text-center text-sm font-semibold shadow-lg animate-fade-up">
+          {gpsWarning}
+          <button
+            onClick={() => setGpsWarning(null)}
+            className="ml-3 bg-white/20 px-3 py-1 rounded-full text-xs hover:bg-white/30 transition-colors"
+          >
+            ✕ Dismiss
+          </button>
+        </div>
+      )}
+      {children({ session: state.session, coords: state.coords, revalidate })}
+    </>
+  );
 }

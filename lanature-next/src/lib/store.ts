@@ -3,7 +3,10 @@ import { type MenuItem, type CartItem, type Order } from './constants';
 import {
   fetchMenu, addMenuItem, updateMenuItem, deleteMenuItem,
   fetchOrders, createOrder, updateOrderStatusDB, markAllOrdersDelivered,
+  adminAction,
+  placeOrderSecure,
   type DBMenuItem, type DBOrder,
+  type SecureOrderRequest, type SecureOrderResponse,
 } from './supabase';
 
 export type { MenuItem, CartItem, Order };
@@ -44,7 +47,8 @@ export async function getMenuData(): Promise<MenuItem[]> {
 }
 
 export async function addProduct(product: Omit<MenuItem, 'id'>): Promise<MenuItem | null> {
-  const result = await addMenuItem({
+  // Route through admin edge function (RLS blocks direct insert)
+  const success = await adminAction('add_menu_item', {
     name: product.name,
     category: product.category,
     price: product.price,
@@ -52,22 +56,29 @@ export async function addProduct(product: Omit<MenuItem, 'id'>): Promise<MenuIte
     img: product.img,
     veg: product.veg,
   });
-  return result ? dbMenuToApp(result) : null;
+  // Refetch to get the new item
+  if (success) {
+    const items = await getMenuData();
+    return items[items.length - 1] || null;
+  }
+  return null;
 }
 
 export async function editProduct(id: number, updates: Partial<MenuItem>): Promise<boolean> {
-  const dbUpdates: Partial<DBMenuItem> = {};
+  const dbUpdates: Record<string, unknown> = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.category !== undefined) dbUpdates.category = updates.category;
   if (updates.price !== undefined) dbUpdates.price = updates.price;
   if (updates.desc !== undefined) dbUpdates.description = updates.desc;
   if (updates.img !== undefined) dbUpdates.img = updates.img;
   if (updates.veg !== undefined) dbUpdates.veg = updates.veg;
-  return updateMenuItem(id, dbUpdates);
+  // Route through admin edge function (RLS blocks direct update)
+  return adminAction('update_menu_item', { id, updates: dbUpdates });
 }
 
 export async function deleteProduct(id: number): Promise<boolean> {
-  return deleteMenuItem(id);
+  // Route through admin edge function (RLS blocks direct delete)
+  return adminAction('delete_menu_item', { id });
 }
 
 /* ─── Orders (async — Supabase) ─── */
@@ -92,12 +103,17 @@ export async function saveOrder(order: Order & { sessionToken?: string }): Promi
 }
 
 export async function updateOrderStatus(orderId: number, status: Order['status']): Promise<void> {
-  await updateOrderStatusDB(orderId, status);
+  // Route through admin edge function (RLS blocks direct update)
+  await adminAction('update_order_status', { orderNumber: orderId, status });
 }
 
 export async function markAllDelivered(): Promise<void> {
-  await markAllOrdersDelivered();
+  // Route through admin edge function (RLS blocks direct update)
+  await adminAction('mark_all_delivered');
 }
+
+// Re-export secure order placement
+export { placeOrderSecure, type SecureOrderRequest, type SecureOrderResponse };
 
 export function generateOrderId(): number {
   return Math.floor(1000 + Math.random() * 9000);
