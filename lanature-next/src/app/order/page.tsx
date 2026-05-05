@@ -136,46 +136,32 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
       return;
     }
 
-    // ── GPS Re-check before placing order ──
+    // ── Place order through SECURE edge function ──
+    // Edge function handles GPS, session, and price validation server-side
     setGpsChecking(true);
     setGpsError(null);
 
-    const result = await revalidate();
-
-    if (!result) {
-      setGpsChecking(false);
-      setGpsError({
-        type: 'GPS_ERROR',
-        message: 'Location verify nahi ho paayi. Kripya GPS on karein aur retry karein.',
-      });
-      return;
-    }
-
-    if (!result.valid) {
-      setGpsChecking(false);
-      setGpsError({
-        type: result.reason,
-        message: result.message,
-        distance: result.distance,
-      });
-      return;
-    }
-
-    setGpsChecking(false);
-
-    // ✅ GPS verified — place order through SECURE edge function
-    setGpsChecking(true); // Show loading while edge function processes
-
     try {
-      const currentCoords = await import('@/lib/geo').then(m => m.getCurrentPosition());
+      // Try to get current GPS for server-side verification
+      let userLat: number | undefined;
+      let userLng: number | undefined;
+      
+      try {
+        const currentCoords = await import('@/lib/geo').then(m => m.getCurrentPosition());
+        userLat = currentCoords.lat;
+        userLng = currentCoords.lng;
+      } catch {
+        // GPS not available — edge function will skip distance check
+        console.warn('GPS coords not available, proceeding without');
+      }
       
       const response = await placeOrderSecure({
         sessionToken: session.token,
         customer: customerName.trim(),
         items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
-        paymentMethod: 'cash', // Will be updated on payment page
-        userLat: currentCoords.lat,
-        userLng: currentCoords.lng,
+        paymentMethod: 'cash',
+        userLat,
+        userLng,
       });
 
       setGpsChecking(false);
@@ -200,15 +186,16 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
         paymentMethod: null,
         time: response.order!.time || new Date().toISOString(),
         sessionToken: session.token,
-        serverVerified: true, // Flag that order is already saved by server
+        serverVerified: true,
       };
       sessionStorage.setItem('lanature_pending_order', JSON.stringify(confirmedOrder));
       router.push('/payment');
     } catch (err) {
+      console.error('Order placement error:', err);
       setGpsChecking(false);
       setGpsError({
-        type: 'GPS_ERROR',
-        message: 'Location verify nahi ho paayi. Kripya GPS on karein aur retry karein.',
+        type: 'SERVER_ERROR',
+        message: 'Order place nahi ho paya. Kripya retry karein.',
       });
     }
   };
