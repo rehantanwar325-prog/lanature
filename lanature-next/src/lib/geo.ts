@@ -35,8 +35,8 @@ export function isWithinRange(
   current: GeoCoords,
   maxMeters: number
 ): { inRange: boolean; distance: number } {
-  const distance = haversineDistance(origin.lat, origin.lng, current.lat, current.lng);
-  return { inRange: distance <= maxMeters, distance: Math.round(distance) };
+  // Location check disabled - always return in range
+  return { inRange: true, distance: 0 };
 }
 
 /**
@@ -44,67 +44,17 @@ export function isWithinRange(
  * Returns GPS coordinates or throws with a user-friendly reason.
  */
 export function getCurrentPosition(): Promise<GeoCoords> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      // Browser doesn't support GPS, try IP fallback directly
-      fetchIpLocation().then(resolve).catch(() => reject(new Error('GPS_NOT_SUPPORTED')));
-      return;
-    }
-
-    let isResolved = false;
-
-    // Strict manual timeout because browser timeout doesn't fire if user ignores prompt
-    const timeoutId = setTimeout(() => {
-      if (!isResolved) {
-        isResolved = true;
-        // Try IP fallback
-        fetchIpLocation()
-          .then(resolve)
-          .catch(() => reject(new Error('GPS_TIMEOUT')));
-      }
-    }, 10000); // 10 seconds strict timeout
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeoutId);
-          resolve({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        }
-      },
-      (err) => {
-        if (!isResolved) {
-          isResolved = true;
-          clearTimeout(timeoutId);
-          // On explicit error, try IP fallback first
-          fetchIpLocation()
-            .then(resolve)
-            .catch(() => {
-              switch (err.code) {
-                case err.PERMISSION_DENIED:
-                  reject(new Error('GPS_DENIED'));
-                  break;
-                case err.POSITION_UNAVAILABLE:
-                  reject(new Error('GPS_UNAVAILABLE'));
-                  break;
-                case err.TIMEOUT:
-                  reject(new Error('GPS_TIMEOUT'));
-                  break;
-                default:
-                  reject(new Error('GPS_ERROR'));
-              }
-            });
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 30000,
-      }
-    );
+  return new Promise((resolve) => {
+    // Location check disabled - resolve with hotel coordinates immediately
+    import('./config')
+      .then((m) => m.getHotelConfig())
+      .then((config) => {
+        resolve({ lat: config.hotelLat, lng: config.hotelLng });
+      })
+      .catch(() => {
+        // Fallback to Shimla Hotel coordinates if config fetch fails
+        resolve({ lat: 31.1048, lng: 77.1734 });
+      });
   });
 }
 
