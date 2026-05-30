@@ -54,6 +54,8 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
   const [cartOpen, setCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [nameError, setNameError] = useState(false);
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [phoneError, setPhoneError] = useState(false);
   const [addedId, setAddedId] = useState<number | null>(null);
   const [gpsChecking, setGpsChecking] = useState(false);
   const [gpsError, setGpsError] = useState<{ type: string; message: string; distance?: number } | null>(null);
@@ -127,10 +129,17 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   const handlePlaceOrder = async () => {
+    let hasError = false;
     if (!customerName.trim()) {
       setNameError(true);
-      return;
+      hasError = true;
     }
+    if (!customerPhone.trim() || !/^\d{10}$/.test(customerPhone.trim())) {
+      setPhoneError(true);
+      hasError = true;
+    }
+    if (hasError) return;
+
     if (cart.length === 0) {
       alert('Please add items to your cart first!');
       return;
@@ -157,7 +166,7 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
       
       const response = await placeOrderSecure({
         sessionToken: session.token,
-        customer: customerName.trim(),
+        customer: `${customerName.trim()} (${customerPhone.trim()})`,
         items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
         paymentMethod: 'cash',
         userLat,
@@ -392,6 +401,20 @@ function SecuredMenu({ session, coords, revalidate }: SecuredMenuProps) {
               nameError ? 'border-status-new' : 'border-[#e0ddd5] focus:border-accent focus:shadow-[0_0_0_3px_rgba(201,168,76,0.15)]'
             }`}
             maxLength={40}
+          />
+          <input
+            type="tel"
+            placeholder={phoneError ? '⚠ Please enter 10-digit phone number!' : 'Enter your phone number *'}
+            value={customerPhone}
+            onChange={e => { 
+              const val = e.target.value.replace(/\D/g, ''); // Only digits
+              setCustomerPhone(val); 
+              setPhoneError(false); 
+            }}
+            className={`w-full px-4 py-3 rounded-[8px] border-2 text-sm mb-3 outline-none transition-all ${
+              phoneError ? 'border-status-new' : 'border-[#e0ddd5] focus:border-accent focus:shadow-[0_0_0_3px_rgba(201,168,76,0.15)]'
+            }`}
+            maxLength={10}
           />
 
           {/* GPS Status */}
